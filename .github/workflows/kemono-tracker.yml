@@ -8,12 +8,16 @@ on:
 jobs:
   check_updates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Explicitly grant write permission
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Critical addition to avoid reference issues
+          ref: ${{ github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -32,25 +36,25 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          # Ensure the correct branch is tracked
+          git branch --set-upstream-to=origin/main main
 
-      - name: Commit and Force Push
+      - name: Commit and Push Changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Add file and commit if changes exist
+          # Verify remote connection
+          git remote -v
+          
+          # Pull with rebase to ensure we're up-to-date
+          git pull --rebase origin main
+          
+          # Stage and commit changes
           git add last_seen.json
           if ! git diff --cached --quiet; then
             git commit -m "Update last_seen.json [skip ci]"
-            
-            # Fetch and reset to origin/main (cleanest way to handle conflicts)
-            git fetch origin
-            git reset --hard origin/main
-            
-            # Reapply our commit on top
-            git cherry-pick --keep-redundant-commits HEAD@{1}
-            
-            # Force push (safe since we just reset to origin)
-            git push origin main
+            # Push with lease as final safety check
+            git push --force-with-lease origin main
           else
             echo "No changes to commit"
           fi
