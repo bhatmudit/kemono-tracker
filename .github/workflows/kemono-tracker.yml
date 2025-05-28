@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests
-      
+
       - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -30,6 +30,10 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add last_seen.json
-          git diff --cached --quiet || (git commit -m "Update last_seen.json [skip ci]" && git push)
+          git diff --cached --quiet || (
+            git commit -m "Update last_seen.json [skip ci]"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+            git push origin HEAD:${{ github.ref_name }}
+          )
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
