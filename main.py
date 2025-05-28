@@ -4,6 +4,9 @@ import json
 import os
 from threading import Thread
 from flask import Flask
+import sys
+print(f"Python version: {sys.version}")
+print(f"Running on Render: {'RENDER' in os.environ}")
 
 # Configuration
 CREATORS = [
