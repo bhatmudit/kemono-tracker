@@ -8,15 +8,10 @@ on:
 jobs:
   check_updates:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: main  # Explicitly checkout main branch
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -24,32 +19,48 @@ jobs:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests pygithub
 
       - name: Run Kemono Tracker script
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Configure Git
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git config --global pull.rebase true
-
-      - name: Commit and Push (Atomic Operation)
+      - name: Update file via GitHub API
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create new orphan branch to avoid all history conflicts
-          git checkout --orphan temp-branch
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "Update last_seen.json [skip ci]"
-            # Force push to main by overwriting history completely
-            git branch -D main
-            git branch -m main
-            git push origin main --force
-          else
-            echo "No changes to commit"
-          fi
+          python - <<EOF
+          from github import Github
+          import json
+          import os
+
+          # Initialize GitHub client
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo("bhatmudit/kemono-tracker")
+
+          # Get current file content
+          try:
+              file = repo.get_contents("last_seen.json")
+              current_content = file.decoded_content.decode()
+              sha = file.sha
+          except:
+              current_content = "{}"
+              sha = None
+
+          # Read updated content
+          with open("last_seen.json", "r") as f:
+              new_content = f.read()
+
+          # Update if changed
+          if current_content != new_content:
+              repo.update_file(
+                  path="last_seen.json",
+                  message="Update last_seen.json [skip ci]",
+                  content=new_content,
+                  sha=sha
+              )
+              print("File updated successfully")
+          else:
+              print("No changes detected")
+          EOF
