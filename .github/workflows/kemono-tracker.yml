@@ -2,45 +2,38 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *'  # Runs hourly
+  workflow_dispatch:     # Manual trigger
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # 1. Checkout with NO history
+      - name: Checkout fresh
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Gets complete fresh state
 
+      # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Run Kemono Tracker script
+      # 3. Run your tracker
+      - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Update file via GitHub API (No Git!)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 4. COMMIT AND ABSOLUTELY FORCE PUSH
+      - name: Force Update last_seen.json
         run: |
-          # Get current file SHA
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/bhatmudit/kemono-tracker/contents/last_seen.json | \
-            jq -r '.sha')
-
-          # Encode new content
-          CONTENT=$(base64 -w0 last_seen.json)
-          MESSAGE="Update last_seen.json [skip ci]"
-
-          # Update file via API
-          curl -X PUT -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d '{"message":"'"$MESSAGE"'","content":"'"$CONTENT"'","sha":"'"$SHA"'"}' \
-            https://api.github.com/repos/bhatmudit/kemono-tracker/contents/last_seen.json
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          
+          git add last_seen.json
+          git commit -m "Update last_seen.json [skip ci]" || exit 0
+          git push origin HEAD:main --force
