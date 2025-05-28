@@ -10,30 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout with NO history
       - name: Checkout fresh
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Gets complete fresh state
+          fetch-depth: 0
 
-      # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      # 3. Run your tracker
       - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      # 4. COMMIT AND ABSOLUTELY FORCE PUSH
-      - name: Force Update last_seen.json
+      - name: Commit and push updates if any
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          
+
           git add last_seen.json
-          git commit -m "Update last_seen.json [skip ci]" || exit 0
-          git push origin HEAD:main --force
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update last_seen.json [skip ci]"
+
+          for i in 1 2 3; do
+            if git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git HEAD:main; then
+              echo "Pushed successfully."
+              break
+            else
+              echo "Push failed, pulling latest changes and retrying..."
+              git pull --rebase origin main
+            fi
+          done
