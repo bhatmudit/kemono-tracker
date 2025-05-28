@@ -1,39 +1,49 @@
-name: Kemono Patreon Tracker
+name: Kemono Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs hourly
-  workflow_dispatch:     # Manual trigger
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual triggering
+  push:
+    branches: [ main ]
+    paths: 
+      - 'kemono_tracker.py'
+      - '.github/workflows/kemono-tracker.yml'
 
 jobs:
-  check_updates:
+  track-updates:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1. Checkout with NO history
-      - name: Checkout fresh
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Gets complete fresh state
-
-      # 2. Setup Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      # 3. Run your tracker
-      - name: Run Kemono Tracker
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python kemono_tracker.py
-
-      # 4. COMMIT AND ABSOLUTELY FORCE PUSH
-      - name: Force Update last_seen.json
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          
-          git add last_seen.json
-          git commit -m "Update last_seen.json [skip ci]" || exit 0
-          git push origin HEAD:main --force
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+    
+    - name: Run Kemono tracker
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: python kemono_tracker.py
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add last_seen.json
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update last seen posts [skip ci]"
+          git push
+        fi
