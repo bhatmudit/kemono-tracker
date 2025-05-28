@@ -4,114 +4,79 @@ import json
 import os
 from threading import Thread
 from flask import Flask
-import sys
 
-print(f"Python version: {sys.version}")
-print(f"Running on Render: {'RENDER' in os.environ}")
-
-# Configuration
 CREATORS = [
-    {"service": "patreon", "id": "93759290", "name": "sleyca"},
-    {"service": "patreon", "id": "48733767", "name": "torsten hewson"},
-    {"service": "patreon", "id": "23356351", "name": "mathaz"},
+    {"service": "patreon", "id": "93759290"},
+    {"service": "patreon", "id": "48733767"},
+    {"service": "patreon", "id": "23356351"},
 ]
-CHECK_INTERVAL = 300  # 5 minutes
+CHECK_INTERVAL = 60  # seconds for test, change to 300 (5 min) later
+
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-STORAGE_FILE = "/tmp/last_seen.json"  # Render ephemeral storage
 
-print(f"Discord webhook URL from env: {DISCORD_WEBHOOK_URL}")  # DEBUG: Confirm webhook URL presence
+STORAGE_FILE = "last_seen.json"
 
-app = Flask(__name__)
+app = Flask("")
 
 @app.route("/")
 def home():
-    return "Kemono Tracker Active - Last checked: " + time.ctime()
+    return "Test Kemono Patreon Tracker is running!"
 
-@app.route("/health")
-def health():
-    return {"status": "ok", "creators": len(CREATORS)}, 200
-
-@app.route("/test_notify")
-def test_notify():
-    dummy_creator = {"service": "patreon", "id": "000", "name": "Test Creator"}
-    dummy_post = {"id": "999", "title": "Test Post"}
-    notify_discord(dummy_creator, dummy_post)
-    return "Test notification sent"
-
-def run_server():
+def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
-def get_latest_post(service, user_id):
-    try:
-        response = requests.get(
-            f"https://kemono.su/api/v1/{service}/user/{user_id}",
-            timeout=10
-        )
-        json_data = response.json()
-        print(f"API response for {user_id}: {json_data}")  # DEBUG: Show raw API response
-        return json_data[0] if json_data else None
-    except Exception as e:
-        print(f"API Error: {e}")
-        return None
+def get_latest_post_id(service, creator_id):
+    url = f"https://kemono.su/api/v1/{service}/user/{creator_id}"
+    response = requests.get(url)
+    response.raise_for_status()
+    posts = response.json()
+    if posts:
+        return posts[0]["id"]
+    return None
 
-def check_creators():
-    last_seen = load_data()
-    print(f"Loaded last_seen data: {last_seen}")  # DEBUG: show loaded post IDs
+def load_last_seen():
+    if os.path.exists(STORAGE_FILE):
+        with open(STORAGE_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
+def save_last_seen(data):
+    with open(STORAGE_FILE, "w") as f:
+        json.dump(data, f)
+
+def notify_discord(service, creator_id, post_id):
+    if not DISCORD_WEBHOOK_URL:
+        print("❌ Discord webhook URL not set!")
+        return
+    url = f"https://kemono.su/{service}/user/{creator_id}/post/{post_id}"
+    content = {
+        "content": f"🆕 New post from `{creator_id}` on `{service}`!\n{url}"
+    }
+    response = requests.post(DISCORD_WEBHOOK_URL, json=content)
+    if response.status_code != 204:
+        print(f"❌ Failed to send Discord message: {response.text}")
+    else:
+        print(f"✅ Discord notification sent for post {post_id}")
+
+def monitor_creators():
+    last_seen = load_last_seen()
     while True:
         for creator in CREATORS:
-            post = get_latest_post(creator["service"], creator["id"])
-            if not post:
-                print(f"No posts found for {creator['name']}")
-                continue
-
-            print(f"Latest post for {creator['name']}: {post['id']} - {post['title']}")
-
-            if last_seen.get(creator["id"]) != post["id"]:
-                print(f"New post detected for {creator['name']}: {post['id']}")
-                notify_discord(creator, post)
-                last_seen[creator["id"]] = post["id"]
-                save_data(last_seen)
-            else:
-                print(f"No new post for {creator['name']}")
-        
+            service = creator["service"]
+            cid = creator["id"]
+            try:
+                latest_id = get_latest_post_id(service, cid)
+                if latest_id and last_seen.get(cid) != latest_id:
+                    print(f"✅ New post for {cid}: {latest_id}")
+                    notify_discord(service, cid, latest_id)
+                    last_seen[cid] = latest_id
+                    save_last_seen(last_seen)
+                else:
+                    print(f"⏳ No new post for {cid}")
+            except Exception as e:
+                print(f"⚠️ Error checking {cid}: {e}")
         time.sleep(CHECK_INTERVAL)
 
-def notify_discord(creator, post):
-    print(f"Attempting to notify Discord about new post from {creator['name']}")
-    if not DISCORD_WEBHOOK_URL:
-        print("Discord webhook URL missing. Aborting notification.")
-        return
-
-    message = {
-        "content": f"🆕 {creator['name']} posted: {post['title']}\n"
-                  f"https://kemono.su/{creator['service']}/user/{creator['id']}/post/{post['id']}"
-    }
-    try:
-        res = requests.post(DISCORD_WEBHOOK_URL, json=message)
-        print(f"Discord webhook sent: status {res.status_code}, response {res.text}")
-    except Exception as e:
-        print(f"Error sending Discord webhook: {e}")
-
-def load_data():
-    try:
-        with open(STORAGE_FILE, "r") as f:
-            data = json.load(f)
-            print(f"Loaded last_seen data from file: {data}")
-            return data
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        return {}
-
-def save_data(data):
-    try:
-        with open(STORAGE_FILE, "w") as f:
-            json.dump(data, f)
-        print(f"Saved last_seen data: {data}")
-    except Exception as e:
-        print(f"Error saving data: {e}")
-
 if __name__ == "__main__":
-    print("Starting Kemono Tracker...")
-    Thread(target=run_server, daemon=True).start()
-    check_creators()
+    Thread(target=run_flask).start()
+    monitor_creators()
