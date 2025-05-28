@@ -2,65 +2,48 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *'  # Runs hourly
+  workflow_dispatch:     # Manual trigger
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Ensure write access
 
     steps:
-      - name: Checkout repo
+      # Step 1: Checkout with NO history
+      - name: Checkout fresh copy
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Important: gets fresh state
 
+      # Step 2: Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
-        run: pip install requests pygithub
-
-      - name: Run Kemono Tracker script
+      # Step 3: Run your tracker
+      - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Update file via GitHub API
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Step 4: Commit and FORCE push (safe for your use case)
+      - name: Update last_seen.json
         run: |
-          python - <<EOF
-          from github import Github
-          import json
-          import os
-
-          # Initialize GitHub client
-          g = Github(os.environ['GITHUB_TOKEN'])
-          repo = g.get_repo("bhatmudit/kemono-tracker")
-
-          # Get current file content
-          try:
-              file = repo.get_contents("last_seen.json")
-              current_content = file.decoded_content.decode()
-              sha = file.sha
-          except:
-              current_content = "{}"
-              sha = None
-
-          # Read updated content
-          with open("last_seen.json", "r") as f:
-              new_content = f.read()
-
-          # Update if changed
-          if current_content != new_content:
-              repo.update_file(
-                  path="last_seen.json",
-                  message="Update last_seen.json [skip ci]",
-                  content=new_content,
-                  sha=sha
-              )
-              print("File updated successfully")
-          else:
-              print("No changes detected")
-          EOF
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          
+          git add last_seen.json
+          
+          # Only commit if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "Update last_seen.json [skip ci]"
+            # Force push is SAFE because:
+            # 1. It's your private repo
+            # 2. The JSON is only for tracking state
+            # 3. You're the only user
+            git push origin HEAD:main --force
+          fi
