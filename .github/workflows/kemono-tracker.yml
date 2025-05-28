@@ -3,14 +3,14 @@ name: Kemono Patreon Tracker
 on:
   schedule:
     - cron: '0 * * * *'  # Runs hourly
-  workflow_dispatch:     # Manual trigger
+  workflow_dispatch:     # Allows manual run
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout fresh
+      - name: Checkout repository with full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -20,33 +20,29 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install dependencies
+        run: pip install requests
+
       - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Commit and push updates if any
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+      - name: Configure git user
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
+      - name: Commit and push last_seen.json safely
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
           git add last_seen.json
+          git diff --cached --quiet || git commit -m "Update last_seen.json [skip ci]"
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "Update last_seen.json [skip ci]"
-
+          # Try push with retries on conflicts
           for i in 1 2 3; do
-            if git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git HEAD:main; then
-              echo "Pushed successfully."
-              break
-            else
-              echo "Push failed, pulling latest changes and retrying..."
-              git pull --rebase origin main
-            fi
+            git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }} HEAD:main && break
+            echo "Push failed, pulling changes and retrying (attempt $i)..."
+            git pull --rebase origin main
           done
