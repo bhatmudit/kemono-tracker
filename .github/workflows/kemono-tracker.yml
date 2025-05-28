@@ -2,20 +2,20 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour
-  workflow_dispatch:    # manual trigger
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:     # Manual trigger
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo with full history
+      - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Get full history
 
-      - name: Set up Python 3.x
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
@@ -28,26 +28,20 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Configure git user
+      - name: Configure Git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Pull latest changes with rebase
-        run: git pull --rebase origin main
-
-      - name: Commit and push updates if any
+      - name: Commit & Force Push (Safe since you're the only user)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Or a PAT if needed
         run: |
           git add last_seen.json
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "Update last_seen.json [skip ci]"
-            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main || (
-              echo "Push failed, pulling latest changes and retrying..."
-              git pull --rebase origin main
-              git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
-            )
+            git pull --rebase origin main  # Try normal pull first
+            git push origin main || git push --force-with-lease origin main
           fi
