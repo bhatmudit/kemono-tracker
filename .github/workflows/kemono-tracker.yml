@@ -2,44 +2,38 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # hourly
-  workflow_dispatch:
+    - cron: '0 * * * *'  # Runs hourly
+  workflow_dispatch:     # Manual trigger
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout with NO history
+      - name: Checkout fresh
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Gets complete fresh state
 
-      - uses: actions/setup-python@v4
+      # 2. Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
-        run: pip install requests
-
+      # 3. Run your tracker
       - name: Run Kemono Tracker
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python kemono_tracker.py
 
-      - name: Configure git user
+      # 4. COMMIT AND ABSOLUTELY FORCE PUSH
+      - name: Force Update last_seen.json
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-
-      - name: Commit and push last_seen.json safely
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
+          
           git add last_seen.json
-          git diff --cached --quiet || git commit -m "Update last_seen.json [skip ci]"
-
-          for i in 1 2 3; do
-            git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }} HEAD:main && break
-            echo "Push failed, pulling changes and retrying (attempt $i)..."
-            git pull --rebase origin main
-          done
+          git commit -m "Update last_seen.json [skip ci]" || exit 0
+          git push origin HEAD:main --force
