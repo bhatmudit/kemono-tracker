@@ -2,21 +2,19 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs hourly
-  workflow_dispatch:     # Allows manual run
+    - cron: '0 * * * *'  # hourly
+  workflow_dispatch:
 
 jobs:
   check_updates:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository with full history
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
@@ -40,7 +38,6 @@ jobs:
           git add last_seen.json
           git diff --cached --quiet || git commit -m "Update last_seen.json [skip ci]"
 
-          # Try push with retries on conflicts
           for i in 1 2 3; do
             git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }} HEAD:main && break
             echo "Push failed, pulling changes and retrying (attempt $i)..."
