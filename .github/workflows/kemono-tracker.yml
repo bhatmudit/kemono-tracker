@@ -2,8 +2,8 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour at minute 0
-  workflow_dispatch:      # manual trigger option
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:      # manual trigger
 
 jobs:
   check_updates:
@@ -33,6 +33,7 @@ jobs:
           git diff --cached --quiet || (
             git commit -m "Update last_seen.json [skip ci]"
             git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+            git pull --rebase origin ${{ github.ref_name }}
             git push origin HEAD:${{ github.ref_name }}
           )
         env:
