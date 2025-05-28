@@ -2,8 +2,8 @@ name: Kemono Patreon Tracker
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour
-  workflow_dispatch:     # Manual trigger
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   check_updates:
@@ -11,9 +11,9 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get full history
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -33,15 +33,24 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Commit & Force Push (Safe since you're the only user)
+      - name: Commit and Force Push
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Or a PAT if needed
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Add file and commit if changes exist
           git add last_seen.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
+          if ! git diff --cached --quiet; then
             git commit -m "Update last_seen.json [skip ci]"
-            git pull --rebase origin main  # Try normal pull first
-            git push origin main || git push --force-with-lease origin main
+            
+            # Fetch and reset to origin/main (cleanest way to handle conflicts)
+            git fetch origin
+            git reset --hard origin/main
+            
+            # Reapply our commit on top
+            git cherry-pick --keep-redundant-commits HEAD@{1}
+            
+            # Force push (safe since we just reset to origin)
+            git push origin main
+          else
+            echo "No changes to commit"
           fi
