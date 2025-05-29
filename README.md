@@ -1,4 +1,4 @@
-# 🔍 Kemono Tracker
+# 🔍 Kemono Tracker // Decomissioned 
 
 A simple Python script that checks for new posts from specific creators on [kemono.su](https://kemono.su) and notifies a Discord channel via webhook. Useful for fans who want instant updates from their favorite Patreon creators.
 
