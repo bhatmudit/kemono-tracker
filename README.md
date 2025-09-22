@@ -1,16 +1,8 @@
-# 🔍 Kemono Tracker // Decomissioned 
+Kemono Tracker
 
-A simple Python script that checks for new posts from specific creators on [kemono.su](https://kemono.su) and notifies a Discord channel via webhook. Useful for fans who want instant updates from their favorite Patreon creators.
+A simple Python script that checks for new posts from specific creators on [kemono.su](https://kemono.su) and notifies a Discord channel via webhook.
 
-## ⚙️ Features
-
-- Monitors multiple creators on Patreon via Kemono.
-- Sends rich Discord notifications on new posts.
-- Maintains state with `last_seen.json`.
-- Supports GitHub Actions for automated hourly checks.
-- Logs activity with rotation support.
-
-## 🚀 Setup
+Setup
 
 1. Clone the repository and install dependencies:
 
@@ -30,7 +22,7 @@ export DISCORD_WEBHOOK_URL="your_webhook_url"
 python kemono_tracker.py
 ```
 
-## 🤖 GitHub Actions Setup
+GitHub Actions Setup
 
 To automate checks every hour, create a workflow file at `.github/workflows/kemono-tracker.yml`:
 
@@ -85,16 +77,12 @@ jobs:
           git push
 ```
 
-📌 Don’t forget to add `DISCORD_WEBHOOK_URL` as a secret in your repository’s **Settings > Secrets and variables > Actions**.
+Don’t forget to add `DISCORD_WEBHOOK_URL` as a secret in your repository’s **Settings > Secrets and variables > Actions**.
 
-## 📄 Logs
+Logs
 
 Logs are written to `tracker.log`. Old logs are trimmed automatically to keep size manageable.
 
-## 📁 State Tracking
+State tracking
 
 The file `last_seen.json` keeps track of the latest post IDs seen per creator. It's committed back to the repo during GitHub Action runs to persist state.
-
-## 📬 Credits
-
-Created by a fan to keep track of content updates.
