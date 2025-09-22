@@ -97,8 +97,4 @@ The file `last_seen.json` keeps track of the latest post IDs seen per creator. I
 
 ## 📬 Credits
 
-Created by a fan to keep track of content updates from:
-
-- Sleyca
-- Torsten Hewson
-- Mathaz
+Created by a fan to keep track of content updates.
